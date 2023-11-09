@@ -49,10 +49,18 @@
 		// $cascading_donations_aa = "D3B42CWMY3A6I6GHC6KUJJSUKOCBE77U"; // livenet
 	  // $cascading_donations_aa = "ARJGCY7F33YB2HONUYQJ2FH6JK2AUJDM"; // testnet
 		$cascading_donations_aa = "UG5CTWIJ3DSVTYHHFR2VNGAV674FHPY3"; // testkit
-		$repository = "alice/first"; // your repository here
+		$owner = "alice"; // your repository here
 
 		$asset = var['asset'];
 		$supply = var['supply'];
+
+		if (trigger.data.repo) {
+			$split = split(trigger.data.repo, "/");
+			if ($split.length == 2) {
+				$trigger_owner = $split[0];
+			}
+			
+		}
 	}`,
 
 	// our outputs
@@ -96,7 +104,7 @@
 			//
 			// Here we reward the donor with newly issued tokens. The amount is the same as the donation amount if the donation was in bytes, otherwise the equivalent according to the current exchange rate.
 			{
-				if: `{ $asset AND trigger.address == $cascading_donations_aa AND exists(trigger.data.repo) AND trigger.data.repo == $repository AND is_valid_address(trigger.data.donor) AND trigger.data.amount AND trigger.data.asset }`,
+				if: `{ $asset AND $trigger_owner AND trigger.address == $cascading_donations_aa AND exists(trigger.data.repo) AND $owner == $trigger_owner AND is_valid_address(trigger.data.donor) AND trigger.data.amount AND trigger.data.asset }`,
 				init: `{
 					$amount = $asset_to_base(trigger.data.asset, trigger.data.amount);
 				}`,
