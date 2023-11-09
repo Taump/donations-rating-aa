@@ -9,37 +9,26 @@ describe('Check simple AA', function () {
 
 	before(async () => {
 		this.network = await Network.create()
-			.with.agent({ simpleAgent: path.join(__dirname, AA_PATH) })
+			.with.numberOfWitnesses(1)
+			.with.agent({ rating: path.join(__dirname, AA_PATH) })
 			.with.wallet({ alice: 1e6 })
 			.with.wallet({ bob: 1e3 })
-			.run()
+			.run();
+
+		this.alice = this.network.wallet.alice;
+		this.aliceAddress = await this.alice.getAddress();
+		this.bob = this.network.wallet.bob;
+		this.bobAddress = await this.bob.getAddress();
+
+		this.ratingAddress = this.network.agent.rating;
 	})
 
-	it('Send bytes and check balance', async () => {
-		const { unit } = await this.network.wallet.alice.sendBytes({
-			toAddress: await this.network.wallet.bob.getAddress(),
-			amount: 10000
-		})
-
-		expect(unit).to.be.validUnit
-		await this.network.witnessUntilStable(unit)
-
-		const bobBalance = await this.network.wallet.bob.getBalance()
-		expect(bobBalance.base.pending).to.be.equal(0)
-		expect(bobBalance.base.stable).to.be.equal(11000)
-
-		const aliceBalance = await this.network.wallet.alice.getBalance()
-		expect(aliceBalance.base.pending).to.be.equal(0)
-		expect(aliceBalance.base.stable).to.be.equal(989626)
-	}).timeout(60000)
-
-	it('Trigger AA', async () => {
+	it('Issue rating asset', async () => {
 		const { unit, error } = await this.network.wallet.alice.triggerAaWithData({
-			toAddress: this.network.agent.simpleAgent,
+			toAddress: this.network.agent.rating,
 			amount: 10000,
 			data: {
-				a: 100,
-				b: 200
+				define: 1
 			}
 		})
 
@@ -47,7 +36,14 @@ describe('Check simple AA', function () {
 		expect(unit).to.be.validUnit
 
 		const { response } = await this.network.getAaResponseToUnitOnNode(this.network.wallet.alice, unit)
-		expect(response.response.responseVars.result).to.be.equal(300)
+		expect(response.response.responseVars.asset).not.to.be.undefined;
+		this.ratingAsset = response.response.responseVars.asset;
+
+
+		const { vars } = await this.alice.readAAStateVars(this.ratingAddress)
+		expect(vars.supply).to.be.eq(0);
+		expect(vars.asset).to.be.eq(this.ratingAsset);
+
 	}).timeout(60000)
 
 	after(async () => {
