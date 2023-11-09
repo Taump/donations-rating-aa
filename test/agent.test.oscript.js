@@ -26,14 +26,15 @@ describe('Check rating AA', function () {
 			.with.agent({ rating: path.join(__dirname, AA_PATH) })
 			.with.wallet({ attestor: 100e9 }, ATTESTOR_MNEMONIC)
 			// .with.wallet({ oracle: { base: 1e9 } })
-			.with.wallet({ alice: 100e9 })
-			.with.wallet({ bob: 100e9 })
+			.with.wallet({ alice: {base: 100e9, usdc: 100e9, eth: 100e9} })
+			.with.wallet({ bob: {base: 100e9, usdc: 100e9, eth: 100e9} })
 			.run();
 
 		this.alice = this.network.wallet.alice;
 		this.aliceAddress = await this.alice.getAddress();
 		this.bob = this.network.wallet.bob;
 		this.bobAddress = await this.bob.getAddress();
+		this.bobRatingAmount = 0;
 		// this.oracle = this.network.wallet.oracle;
 		// this.oracleAddress = await this.oracle.getAddress();
 		this.attestor = this.network.wallet.attestor;
@@ -234,7 +235,7 @@ describe('Check rating AA', function () {
 	it('Bob donate GBYTE to repo1 and notify rating AA', async () => {
 		const { unit, error } = await this.bob.triggerAaWithData({
 			toAddress: this.cascadingDonationsAddress,
-			amount: 1e9, // 5 GBYTE
+			amount: 1e9, // 1 GBYTE
 			data: {
 				repo: this.repo1,
 				donate: 1
@@ -257,6 +258,8 @@ describe('Check rating AA', function () {
 
 		const amount = 1e9 - 1e3;
 
+		this.bobRatingAmount += amount;
+
 		expect(unitObj.messages.find((m)=> m.app==='data')?.payload).to.deep.equalInAnyOrder(
 			{
 				repo: this.repo1,
@@ -271,6 +274,83 @@ describe('Check rating AA', function () {
 		expect(vars.supply).to.be.eq(amount);
 		expect(vars[`rating*${this.bobAddress}`]).to.be.eq(amount);
 		expect(vars[`rating*${this.repo1}*${this.bobAddress}`]).to.be.eq(amount);
+		
+		const { response: response2 } = await this.network.getAaResponseToUnitOnNode(this.network.wallet.alice, response.response_unit);
+
+		expect(Utils.getExternalPayments(response2.objResponseUnit)).to.deep.equalInAnyOrder([
+			{
+				address: this.bobAddress,
+				amount,
+				asset: this.ratingAsset
+			}
+		]);
+	});
+
+
+
+	it('Bob donate USDC to repo1 and notify rating AA', async () => {
+		const usdcAmount = 10e4;
+
+		const { unit, error } = await this.bob.sendMulti({
+			base_outputs: [
+				{
+					address: this.cascadingDonationsAddress,
+					amount: BOUNCE_FEE
+				}
+			],
+			asset_outputs: [
+				{
+					address: this.cascadingDonationsAddress,
+					amount: usdcAmount
+				}
+			],
+			asset: this.usdcAsset,
+			messages: [
+				{
+					app: 'data',
+					payload_location: 'inline',
+					payload: {
+						donate: 1,
+						repo: this.repo1
+					}
+				}
+			]
+		})
+
+		expect(error).to.be.null;
+		expect(unit).to.be.validUnit;
+
+		const { response } = await this.network.getAaResponseToUnitOnNode(this.network.wallet.alice, unit);
+
+		const { unitObj } = await this.alice.getUnitInfo({ unit: response.response_unit })
+
+		expect(Utils.getExternalPayments(unitObj)).to.deep.equalInAnyOrder([
+			{
+				address: this.ratingAddress,
+				amount: 100,
+			}
+		]);
+
+		expect(unitObj.messages.find((m)=> m.app==='data')?.payload).to.deep.equalInAnyOrder(
+			{
+				repo: this.repo1,
+				donor: this.bobAddress,
+				amount: usdcAmount,
+				asset: this.usdcAsset
+			}
+		);
+
+		const { vars } = await this.alice.readAAStateVars(this.ratingAddress);
+
+		const rate = this.oracleData.USDC_USD / this.oracleData.GBYTE_USD;
+
+		const amount = Math.floor((usdcAmount / 10 ** 4) * rate * 1e9);
+
+		this.bobRatingAmount += amount;
+		
+		expect(vars.supply).to.be.eq(this.bobRatingAmount);
+		expect(vars[`rating*${this.bobAddress}`]).to.be.eq(this.bobRatingAmount);
+		expect(vars[`rating*${this.repo1}*${this.bobAddress}`]).to.be.eq(this.bobRatingAmount);
 		
 		const { response: response2 } = await this.network.getAaResponseToUnitOnNode(this.network.wallet.alice, response.response_unit);
 
