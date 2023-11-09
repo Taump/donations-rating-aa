@@ -1,7 +1,8 @@
 // uses `aa-testkit` testing framework for AA tests. Docs can be found here `https://github.com/valyakin/aa-testkit`
 // `mocha` standard functions and `expect` from `chai` are available globally
 // `Testkit`, `Network`, `Nodes` and `Utils` from `aa-testkit` are available globally too
-const path = require('path')
+const path = require('path');
+const { ATTESTOR_MNEMONIC, BOUNCE_FEE, DONATION_STORAGE_FEE } = require('./constants');
 const AA_PATH = '../agent.aa'
 
 describe('Check rating AA', function () {
@@ -19,7 +20,10 @@ describe('Check rating AA', function () {
 			.with.asset({ eth: {} })
 			.with.asset({ usdc: {} })
 			.with.agent({ tokenRegistry: path.join(__dirname, '../node_modules/registry-aa/token-registry.oscript') })
+			.with.agent({ attestation_aa: path.join(__dirname, '../node_modules/github-attestation/github.aa') })
+			.with.agent({ cascadingDonations: path.join(__dirname, '../node_modules/cascading-donations-aa/agent.aa') })
 			.with.agent({ rating: path.join(__dirname, AA_PATH) })
+			.with.wallet({ attestor: 100e9 }, ATTESTOR_MNEMONIC)
 			.with.wallet({ oracle: { base: 1e9 } })
 			.with.wallet({ alice: 100e9 })
 			.with.wallet({ bob: 100e9 })
@@ -34,6 +38,8 @@ describe('Check rating AA', function () {
 
 		this.tokenRegistryAddress = this.network.agent.tokenRegistry;
 		this.ratingAddress = this.network.agent.rating;
+		this.cascadingDonationsAddress = this.network.agent.cascadingDonations;
+		this.attestationAddress = this.network.agent.attestation_aa;
 
 		this.usdcAsset = this.network.asset.usdc;
 		this.ethAsset = this.network.asset.eth;
@@ -138,12 +144,43 @@ describe('Check rating AA', function () {
 
 		const { unitObj } = await this.oracle.getUnitInfo({ unit: unit });
 		const dfMessage = unitObj.messages.find(m => m.app === 'data_feed');
-		
+
 		expect(dfMessage.payload.GBYTE_USD).to.be.equal(this.oracleData.GBYTE_USD);
 		expect(dfMessage.payload.USDC_USD).to.be.equal(this.oracleData.USDC_USD);
 		expect(dfMessage.payload.ETH_USD).to.be.equal(this.oracleData.ETH_USD);
 
 		await this.network.witnessUntilStable(unit);
+	}).timeout(60000);
+
+	it('Publish alice attestation profile', async () => {
+		const { unit, error } = await this.network.wallet.attestor.sendMulti({
+			outputs_by_asset: {
+				base: [{ address: this.attestationAddress, amount: BOUNCE_FEE }]
+			},
+			messages: [
+				{
+					app: 'attestation',
+					payload_location: 'inline',
+					payload: {
+						address: this.aliceAddress,
+						profile: {
+							github_username: 'alice'
+						}
+					}
+				},
+				{
+					app: 'data',
+					payload: {
+						address: this.aliceAddress,
+						github_username: 'alice',
+					}
+				},
+			]
+		})
+
+		expect(unit).to.be.validUnit
+		expect(error).to.be.null
+		await this.network.witnessUntilStable(unit)
 	}).timeout(60000);
 
 	after(async () => {

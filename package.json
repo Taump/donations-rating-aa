@@ -14,7 +14,9 @@
     "chai": "^4.2.0",
     "mocha": "^6.2.0",
     "aa-testkit": "git+https://github.com/valyakin/aa-testkit.git",
-    "registry-aa": "git+https://github.com/byteball/token-registry-aa.git"
+    "registry-aa": "git+https://github.com/byteball/token-registry-aa.git",
+    "cascading-donations-aa":  "git+https://github.com/byteball/obyte-cascading-donations.git",
+    "github-attestation": "git+https://github.com/byteball/github-attestation.git"
   },
   "devDependencies": {
     "eslint": "^6.3.0",
