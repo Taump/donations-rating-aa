@@ -4,8 +4,14 @@
 const path = require('path')
 const AA_PATH = '../agent.aa'
 
-describe('Check simple AA', function () {
-	this.timeout(120000)
+describe('Check rating AA', function () {
+	this.timeout(120000);
+
+	this.oracleData = {
+		'GBYTE_USD': 100,
+		'USDC_USD': 1,
+		'ETH_USD': 1000,
+	};
 
 	before(async () => {
 		this.network = await Network.create()
@@ -23,6 +29,8 @@ describe('Check simple AA', function () {
 		this.aliceAddress = await this.alice.getAddress();
 		this.bob = this.network.wallet.bob;
 		this.bobAddress = await this.bob.getAddress();
+		this.oracle = this.network.wallet.oracle;
+		this.oracleAddress = await this.oracle.getAddress();
 
 		this.tokenRegistryAddress = this.network.agent.tokenRegistry;
 		this.ratingAddress = this.network.agent.rating;
@@ -111,6 +119,31 @@ describe('Check simple AA', function () {
 
 		const { vars: vars2 } = await this.alice.readAAStateVars(this.tokenRegistryAddress);
 		expect(vars2[`a2s_${this.ethAsset}`]).to.be.eq("ETH");
+	}).timeout(60000);
+
+	it('Post data feed', async () => {
+		const { unit, error } = await this.oracle.sendMulti({
+			messages: [{
+				app: 'data_feed',
+				payload: {
+					GBYTE_USD: this.oracleData.GBYTE_USD,
+					USDC_USD: this.oracleData.USDC_USD,
+					ETH_USD: this.oracleData.ETH_USD,
+				}
+			}],
+		})
+
+		expect(error).to.be.null;
+		expect(unit).to.be.validUnit;
+
+		const { unitObj } = await this.oracle.getUnitInfo({ unit: unit });
+		const dfMessage = unitObj.messages.find(m => m.app === 'data_feed');
+		
+		expect(dfMessage.payload.GBYTE_USD).to.be.equal(this.oracleData.GBYTE_USD);
+		expect(dfMessage.payload.USDC_USD).to.be.equal(this.oracleData.USDC_USD);
+		expect(dfMessage.payload.ETH_USD).to.be.equal(this.oracleData.ETH_USD);
+
+		await this.network.witnessUntilStable(unit);
 	}).timeout(60000);
 
 	after(async () => {
