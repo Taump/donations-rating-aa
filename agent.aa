@@ -10,8 +10,9 @@
 
 		// convert the donated amount to bytes
 		$asset_to_base = ($asset, $amount) => {
-			$oracle_address = "JPQKPRI5FMTQRJF4ZZMYZYDQVRD55OTC"; // livenet
-		//	$oracle_address = "F4KHJUCLJKY4JV7M5F754LAJX4EB7M4N"; // testnet
+			// $oracle_address = "JPQKPRI5FMTQRJF4ZZMYZYDQVRD55OTC"; // livenet
+			//	$oracle_address = "F4KHJUCLJKY4JV7M5F754LAJX4EB7M4N"; // testnet
+			$oracle_address = "QMWQRJV6NCYGUI6X7BWRKLLBQVQYLZ27"; // testkit
 			$token_registry = "O6H6ZIFI57X3PLTYHOCVYPP5A553CYFQ";
 
 			if ($asset == 'base') {
@@ -45,9 +46,10 @@
 
 	// initialization script
 	init: `{
-		$cascading_donations_aa = "D3B42CWMY3A6I6GHC6KUJJSUKOCBE77U"; // livenet
-	//	$cascading_donations_aa = "ARJGCY7F33YB2HONUYQJ2FH6JK2AUJDM"; // testnet
-		$repository = "byteball/ocore"; // your repository here
+		// $cascading_donations_aa = "D3B42CWMY3A6I6GHC6KUJJSUKOCBE77U"; // livenet
+	  // $cascading_donations_aa = "ARJGCY7F33YB2HONUYQJ2FH6JK2AUJDM"; // testnet
+		$cascading_donations_aa = "UG5CTWIJ3DSVTYHHFR2VNGAV674FHPY3"; // testkit
+		$repository = "alice/first"; // your repository here
 
 		$asset = var['asset'];
 		$supply = var['supply'];

@@ -3,6 +3,7 @@
 // `Testkit`, `Network`, `Nodes` and `Utils` from `aa-testkit` are available globally too
 const path = require('path');
 const { ATTESTOR_MNEMONIC, BOUNCE_FEE, DONATION_STORAGE_FEE } = require('./constants');
+
 const AA_PATH = '../agent.aa'
 
 describe('Check rating AA', function () {
@@ -24,7 +25,7 @@ describe('Check rating AA', function () {
 			.with.agent({ cascadingDonations: path.join(__dirname, '../node_modules/cascading-donations-aa/agent.aa') })
 			.with.agent({ rating: path.join(__dirname, AA_PATH) })
 			.with.wallet({ attestor: 100e9 }, ATTESTOR_MNEMONIC)
-			.with.wallet({ oracle: { base: 1e9 } })
+			// .with.wallet({ oracle: { base: 1e9 } })
 			.with.wallet({ alice: 100e9 })
 			.with.wallet({ bob: 100e9 })
 			.run();
@@ -33,8 +34,10 @@ describe('Check rating AA', function () {
 		this.aliceAddress = await this.alice.getAddress();
 		this.bob = this.network.wallet.bob;
 		this.bobAddress = await this.bob.getAddress();
-		this.oracle = this.network.wallet.oracle;
-		this.oracleAddress = await this.oracle.getAddress();
+		// this.oracle = this.network.wallet.oracle;
+		// this.oracleAddress = await this.oracle.getAddress();
+		this.attestor = this.network.wallet.attestor;
+		this.attestorAddress = await this.attestor.getAddress();
 
 		this.tokenRegistryAddress = this.network.agent.tokenRegistry;
 		this.ratingAddress = this.network.agent.rating;
@@ -132,7 +135,7 @@ describe('Check rating AA', function () {
 	}).timeout(60000);
 
 	it('Post data feed', async () => {
-		const { unit, error } = await this.oracle.sendMulti({
+		const { unit, error } = await this.attestor.sendMulti({
 			messages: [{
 				app: 'data_feed',
 				payload: {
@@ -146,7 +149,7 @@ describe('Check rating AA', function () {
 		expect(error).to.be.null;
 		expect(unit).to.be.validUnit;
 
-		const { unitObj } = await this.oracle.getUnitInfo({ unit: unit });
+		const { unitObj } = await this.attestor.getUnitInfo({ unit });
 		const dfMessage = unitObj.messages.find(m => m.app === 'data_feed');
 
 		expect(dfMessage.payload.GBYTE_USD).to.be.equal(this.oracleData.GBYTE_USD);
@@ -228,6 +231,58 @@ describe('Check rating AA', function () {
 
 	}).timeout(60000);
 	
+	it('Bob donate GBYTE to repo1 and notify rating AA', async () => {
+		const { unit, error } = await this.bob.triggerAaWithData({
+			toAddress: this.cascadingDonationsAddress,
+			amount: 1e9, // 5 GBYTE
+			data: {
+				repo: this.repo1,
+				donate: 1
+			}
+		});
+
+		expect(error).to.be.null;
+		expect(unit).to.be.validUnit;
+
+		const { response } = await this.network.getAaResponseToUnitOnNode(this.network.wallet.alice, unit);
+
+		const { unitObj } = await this.alice.getUnitInfo({ unit: response.response_unit })
+
+		expect(Utils.getExternalPayments(unitObj)).to.deep.equalInAnyOrder([
+			{
+				address: this.ratingAddress,
+				amount: 100,
+			}
+		]);
+
+		const amount = 1e9 - 1e3;
+
+		expect(unitObj.messages.find((m)=> m.app==='data')?.payload).to.deep.equalInAnyOrder(
+			{
+				repo: this.repo1,
+				donor: this.bobAddress,
+				amount,
+				asset: 'base'
+			}
+		);
+
+		const { vars } = await this.alice.readAAStateVars(this.ratingAddress)
+		
+		expect(vars.supply).to.be.eq(amount);
+		expect(vars[`rating*${this.bobAddress}`]).to.be.eq(amount);
+		expect(vars[`rating*${this.repo1}*${this.bobAddress}`]).to.be.eq(amount);
+		
+		const { response: response2 } = await this.network.getAaResponseToUnitOnNode(this.network.wallet.alice, response.response_unit);
+
+		expect(Utils.getExternalPayments(response2.objResponseUnit)).to.deep.equalInAnyOrder([
+			{
+				address: this.bobAddress,
+				amount,
+				asset: this.ratingAsset
+			}
+		]);
+	});
+
 	after(async () => {
 		await this.network.stop()
 	})
