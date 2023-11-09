@@ -112,6 +112,9 @@
 						app: 'state',
 						state: `{
 							var['supply'] += $amount;
+							var['rating*' || trigger.data.donor] += $amount;
+							var['rating*' || trigger.data.repo || "*" || trigger.data.donor] += $amount;
+
 							response['message'] = "Thank you for your donation!";
 						}`
 					}

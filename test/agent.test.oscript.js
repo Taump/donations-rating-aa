@@ -43,6 +43,10 @@ describe('Check rating AA', function () {
 
 		this.usdcAsset = this.network.asset.usdc;
 		this.ethAsset = this.network.asset.eth;
+
+		this.repo1 = 'alice/first';
+		this.repo2 = 'alice/second';
+		this.repo3 = 'alice/third';
 	})
 
 	it('Issue rating asset', async () => {
@@ -183,6 +187,47 @@ describe('Check rating AA', function () {
 		await this.network.witnessUntilStable(unit)
 	}).timeout(60000);
 
+	it('Alice set rules and notification AA for her repo', async () => {
+		const rules = {
+			[this.repo2]: 30,
+			[this.repo3]: 30
+		};
+
+		const { unit, error } = await this.network.wallet.alice.triggerAaWithData({
+			toAddress: this.cascadingDonationsAddress,
+			amount: 1e4,
+			data: {
+				set_rules: 1,
+				repo: this.repo1,
+				rules
+			}
+		});
+
+		expect(error).to.be.null;
+		expect(unit).to.be.validUnit;
+
+		const { response } = await this.network.getAaResponseToUnitOnNode(this.network.wallet.alice, unit);
+
+		expect(response.response.responseVars.new_rules).to.be.equal(JSON.stringify(rules));
+
+		const { unit: unit2, error: error2 } = await this.network.wallet.alice.triggerAaWithData({
+			toAddress: this.cascadingDonationsAddress,
+			amount: 1e4,
+			data: {
+				notification_aa: this.ratingAddress,
+				repo: this.repo1,
+			}
+		});
+
+		expect(error2).to.be.null;
+		expect(unit2).to.be.validUnit;
+
+		const { response: response2 } = await this.network.getAaResponseToUnitOnNode(this.network.wallet.alice, unit2);
+
+		expect(response2.response.responseVars.message).to.be.equal(`Set notification AA for ${this.repo1}`);
+
+	}).timeout(60000);
+	
 	after(async () => {
 		await this.network.stop()
 	})
