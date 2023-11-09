@@ -4,7 +4,7 @@
 
 		// check if the token is whitelisted
 		$is_allowed_token = ($symbol) => {
-			$allowed_tokens = ["ETH", "MATIC", "WBTC", "USDC", "BNB"];
+			$allowed_tokens = ["ETH", "USDC"]; // we can change this list
 			length(filter($allowed_tokens, 20, $t => $t == $symbol)) == 1
 		};
 
